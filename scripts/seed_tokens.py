@@ -71,7 +71,7 @@ def process_chunk(
     dataset_type,
 ):
     tokenizer_cfg = OmegaConf.load(tokenizer_cfg_path)
-    tokenizer = hydra.utils.instantiate(tokenizer_cfg, device=rank, load_diffusion=True)
+    tokenizer = hydra.utils.instantiate(tokenizer_cfg, device=rank, load_diffusion=False)
 
     transform_cfg = OmegaConf.load(transform_cfg_path)
     transform = hydra.utils.instantiate(transform_cfg)
@@ -172,8 +172,8 @@ def main():
 
     pyrootutils.setup_root(__file__, indicator='.project-root', pythonpath=True)
 
-    tokenizer_cfg_path = 'configs/tokenizer/seed_llama_tokenizer_hf.yaml'
-    transform_cfg_path = 'configs/transform/clip_transform.yaml'
+    tokenizer_cfg_path = '../configs/tokenizer/seed_llama_tokenizer_hf.yaml'
+    transform_cfg_path = '../configs/transform/clip_transform.yaml'
 
     paths = list(braceexpand.braceexpand(args.paths))
 
