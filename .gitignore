@@ -3,3 +3,5 @@ pretrained/*
 **/__pycache__/**
 log/
 .venv/*
+out.*
+err.*
