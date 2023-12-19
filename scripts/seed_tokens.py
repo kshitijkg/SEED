@@ -27,6 +27,16 @@ ALLOWED_DATASETS = ["laion", "mmc4"]
 EXPECTED_CHUNK_SIZE = 10000
 
 
+def remove_key(sample, keys : list):
+    image, metadata = sample
+    new_metadata = {}
+
+    for k, v in metadata.items():
+        if k not in keys:
+            new_metadata[k] = v
+    new_metadata = {"height" : 256}
+    return image, new_metadata
+
 def get_dataset(dataset_type, path, s3):
     if s3:
         path = f"pipe:aws s3 cp {path} -"
@@ -37,6 +47,10 @@ def get_dataset(dataset_type, path, s3):
             .decode(wds.imagehandler("torchrgb"))
             .to_tuple("jpg", "json")
         )
+        dataset = dataset.map(lambda x : remove_key(x, ["error_message", 
+                                                        "LICENSE", "exif", 
+                                                        "NSFW", 
+                                                        "original_width", "original_height"]))
         return dataset
     elif dataset_type == "mmc4":
 
@@ -91,8 +105,8 @@ def process_chunk(
         try:
             dataset = get_dataset(dataset_type, path, s3)
             dataloader = torch.utils.data.DataLoader(
-                dataset.batched(batch_size),
-                batch_size=None,
+                dataset, #.batched(batch_size),
+                batch_size=batch_size,
                 pin_memory=True,
                 num_workers=num_workers,
             )
