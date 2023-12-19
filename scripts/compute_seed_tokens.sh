@@ -12,10 +12,10 @@
 export CUDA_VISIBLE_DEVICES=0,1,2,3 # ensures GPU_IDs are available with correct indicies
 
 # Args
-START_SHARD="00120"
+START_SHARD="00320"
 echo START_SHARD=$START_SHARD
 
-END_SHARD="00159"
+END_SHARD="00359"
 echo END_SHARD=$END_SHARD
 
 PATHS="/p/fastdata/mmlaion/laion-400m/LAION-400m-webdataset/data/{$START_SHARD..$END_SHARD}.tar"
@@ -36,8 +36,8 @@ echo BATCH_SIZE=$BATCH_SIZE
 
 # Args
 
-source /p/scratch/ccstdl/mhatre1/miniconda3/bin/activate
-conda activate myenv
+source /p/project/ccstdl/gupta6/miniconda3/bin/activate
+conda activate seed
 
 srun --cpu-bind=v --accel-bind=gn python -u seed_tokens.py -p $PATHS \
 						-o $OUTPUT_DIR \
