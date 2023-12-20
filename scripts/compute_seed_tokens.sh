@@ -12,17 +12,16 @@
 export CUDA_VISIBLE_DEVICES=0,1,2,3 # ensures GPU_IDs are available with correct indicies
 
 # Args
-START_SHARD="00320"
+START_SHARD="00360"
 echo START_SHARD=$START_SHARD
 
-END_SHARD="00359"
+END_SHARD="00499"
 echo END_SHARD=$END_SHARD
 
 PATHS="/p/fastdata/mmlaion/laion-400m/LAION-400m-webdataset/data/{$START_SHARD..$END_SHARD}.tar"
 echo PATHS=$PATHS
 
 OUTPUT_DIR="/p/fastdata/mmlaion/seed_tokens_laion_400M/"
-#OUTPUT_DIR="/p/scratch/ccstdl/mhatre1/seed_tokens_laion_400M/"
 echo OUTPUT_PATH=$OUTPUT_DIR
 
 NUM_WORKERS=48
