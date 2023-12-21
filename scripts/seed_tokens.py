@@ -109,7 +109,7 @@ def process_chunk(
                 pin_memory=True,
                 num_workers=num_workers,
             )
-            rows = []
+            rows = {}
             embeddings = []
             for data, metas in tqdm(
                 dataloader,
@@ -121,7 +121,16 @@ def process_chunk(
                 image_tensor = transform(data).to(rank)
                 image_ids = tokenizer.encode_image(image_torch=image_tensor)
 
-                rows.extend(metas)
+                if len(rows.keys()) == 0:
+                    for k, v in metas.items():
+                        if type(v) == torch.Tensor:
+                            v = v.cpu().numpy().tolist()
+                        rows[k] = v
+                else:
+                    for k, v in metas.items():
+                        if type(v) == torch.Tensor:
+                            v = v.cpu().numpy().tolist()
+                        rows[k].extend(v)
                 embeddings.append(image_ids)
             embeddings = torch.cat(embeddings, axis=0)
 
