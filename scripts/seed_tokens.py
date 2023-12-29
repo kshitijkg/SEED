@@ -15,6 +15,8 @@ import pandas as pd
 import webdataset as wds
 import torch.multiprocessing as mp
 
+from webdataset import ShardWriter
+
 from tqdm import tqdm
 from timeit import default_timer as timer
 
@@ -31,7 +33,7 @@ def remove_keys(sample):
     image, metadata = sample
     new_metadata = {}
 
-    keys_to_keep = ['caption', 'similarity']
+    keys_to_keep = ['caption', 'similarity', 'shard_id']
 
     for k, v in metadata.items():
         if k in keys_to_keep:
@@ -46,9 +48,9 @@ def get_dataset(dataset_type, path, s3):
         dataset = (
             wds.WebDataset(path)
             .decode(wds.imagehandler("torchrgb"))
-            .to_tuple("jpg", "json")
+            .to_tuple("png", "json")
         )
-        dataset = dataset.map(remove_keys)
+        # dataset = dataset.map(remove_keys)
 
         return dataset
     elif dataset_type == "mmc4":
@@ -95,53 +97,49 @@ def process_chunk(
         rank * num_paths_per_chunk : min(len(paths), (rank + 1) * num_paths_per_chunk)
     ]
     print (f"Rank: {rank} processing {len(worker_paths)} shards")
-    for path in worker_paths:
-        basename = os.path.basename(path)
-        output_path = os.path.join(
-            output_dir, os.path.splitext(basename)[0] + ".parquet"
-        )
+    write_freq = 5
+    max_items_per_shard = batch_size * write_freq
 
-        try:
-            dataset = get_dataset(dataset_type, path, s3)
-            dataloader = torch.utils.data.DataLoader(
-                dataset, #.batched(batch_size),
-                batch_size=batch_size,
-                pin_memory=True,
-                num_workers=num_workers,
-            )
+    dataset = get_dataset(dataset_type, paths, s3)
+    sink = ShardWriter(os.path.join(output_dir, f"%05d.tar"), maxcount=max_items_per_shard)
+    dataloader = torch.utils.data.DataLoader(
+        dataset, #.batched(batch_size),
+        batch_size=batch_size,
+        pin_memory=True,
+        num_workers=num_workers,
+    )
+
+    num_chunks = len(list(braceexpand.braceexpand(paths)))
+    rows = {}
+    embeddings = []
+    write_count = 0
+    for data, metas in tqdm(dataloader, total=np.ceil((EXPECTED_CHUNK_SIZE * num_chunks) / batch_size), desc=f"Rank : {rank}", position=rank, leave=False):
+        image_tensor = transform(data).to(rank)
+        image_ids = tokenizer.encode_image(image_torch=image_tensor)
+        if len(rows.keys()) == 0:
+            for k, v in metas.items():
+                if type(v) == torch.Tensor:
+                    v = v.cpu().numpy().tolist()
+                rows[k] = v
+        else:
+            for k, v in metas.items():
+                if type(v) == torch.Tensor:
+                    v = v.cpu().numpy().tolist()
+                rows[k].extend(v)
+
+        embeddings.append(image_ids)
+        
+        if (write_count + 1) % write_freq == 0:
+            rows['embeddings'] = embeddings
+
+            for i in range(len(rows['embeddings'])):
+                sample = {}
+                for key, val in rows.items():
+                    sample[key] = val[i]
+                sink.write(sample)
+
             rows = {}
             embeddings = []
-            for data, metas in tqdm(
-                dataloader,
-                total=int(np.ceil(EXPECTED_CHUNK_SIZE / batch_size)),
-                desc=f"Rank : {rank}, Shard: {basename}",
-                position=rank,
-                leave=False,
-            ):
-                image_tensor = transform(data).to(rank)
-                image_ids = tokenizer.encode_image(image_torch=image_tensor)
-
-                if len(rows.keys()) == 0:
-                    for k, v in metas.items():
-                        if type(v) == torch.Tensor:
-                            v = v.cpu().numpy().tolist()
-                        rows[k] = v
-                else:
-                    for k, v in metas.items():
-                        if type(v) == torch.Tensor:
-                            v = v.cpu().numpy().tolist()
-                        rows[k].extend(v)
-                embeddings.append(image_ids)
-            embeddings = torch.cat(embeddings, axis=0)
-
-            df = pd.DataFrame(rows)
-            embeddings_cpu = embeddings.cpu().numpy().reshape(len(df), -1)
-            df["code"] = [item.tobytes() for item in embeddings_cpu]
-            df.to_parquet(output_path, compression="brotli")
-        except Exception:
-            print(f"[-] Failed to process {basename}:", file=sys.stderr)
-            traceback.print_exc()
-
 
 def main():
     parser = argparse.ArgumentParser()
@@ -197,7 +195,8 @@ def main():
     tokenizer_cfg_path = '../configs/tokenizer/seed_llama_tokenizer_hf.yaml'
     transform_cfg_path = '../configs/transform/clip_transform.yaml'
 
-    paths = list(braceexpand.braceexpand(args.paths))
+    # paths = list(braceexpand.braceexpand(args.paths))
+    paths = args.paths
 
     start = timer()
 

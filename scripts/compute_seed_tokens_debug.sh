@@ -18,10 +18,10 @@ echo START_SHARD=$START_SHARD
 END_SHARD="00004" # For debugging
 echo END_SHARD=$END_SHARD
 
-PATHS="/p/fastdata/mmlaion/laion-400m/LAION-400m-webdataset/data/{$START_SHARD..$END_SHARD}.tar"
+PATHS="/p/fastdata/mmlaion/CC-3M/{$START_SHARD..$END_SHARD}.tar"
 echo PATHS=$PATHS
 
-OUTPUT_DIR="/p/scratch/ccstdl/mhatre1/seed_tokens_laion_400M/" # For debugging
+OUTPUT_DIR="/p/scratch/ccstdl/mhatre1/seed_tokens_cc_3M/" # For debugging
 echo OUTPUT_PATH=$OUTPUT_DIR
 
 NUM_WORKERS=48
