@@ -119,6 +119,15 @@ def process_chunk(
     for data, metas in tqdm(dataloader, total=np.ceil((EXPECTED_CHUNK_SIZE * num_chunks) / batch_size), desc=f"Rank : {rank}", position=rank, leave=False):
         image_tensor = data.to(rank)
         image_ids = tokenizer.encode_image(image_torch=image_tensor)
+        # metas["seed_tokens"] = image_ids
+        
+        # for i in range(len(image_ids)):
+        #     sample = {}
+        #     for key, val in metas.items():
+        #         sample[key] = val[i]
+        #     sink.write(sample)
+
+
         if len(rows.keys()) == 0:
             for k, v in metas.items():
                 if type(v) == torch.Tensor:
