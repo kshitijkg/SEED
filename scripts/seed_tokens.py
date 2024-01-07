@@ -28,17 +28,20 @@ ALLOWED_DATASETS = ["laion", "mmc4"]
 
 EXPECTED_CHUNK_SIZE = 10000
 
+from torchvision import transforms
 
-def remove_keys(sample):
+def transform_and_remove_keys(sample):
     image, metadata = sample
-    new_metadata = {}
 
-    keys_to_keep = ['caption', 'similarity', 'shard_id']
-
-    for k, v in metadata.items():
-        if k in keys_to_keep:
-            new_metadata[k] = v
-    return image, new_metadata
+    # CLIP transform without resizing
+    image = transforms.functional.resize(image, (224, 224))
+    image = transforms.functional.normalize(image, mean=(0.48145466, 0.4578275, 0.40821073), std=(0.26862954, 0.26130258, 0.27577711))
+    
+    new_dictionary = {}
+    new_dictionary['key'] = metadata['key']
+    new_dictionary['caption'] = metadata['caption']
+    new_dictionary['uid'] = metadata['uid']
+    return image, new_dictionary
 
 def get_dataset(dataset_type, path, s3):
     if s3:
@@ -48,9 +51,9 @@ def get_dataset(dataset_type, path, s3):
         dataset = (
             wds.WebDataset(path)
             .decode(wds.imagehandler("torchrgb"))
-            .to_tuple("png", "json")
+            .to_tuple("jpg;png;webp", "json")
         )
-        # dataset = dataset.map(remove_keys)
+        dataset = dataset.map(transform_and_remove_keys)
 
         return dataset
     elif dataset_type == "mmc4":
@@ -114,7 +117,7 @@ def process_chunk(
     embeddings = []
     write_count = 0
     for data, metas in tqdm(dataloader, total=np.ceil((EXPECTED_CHUNK_SIZE * num_chunks) / batch_size), desc=f"Rank : {rank}", position=rank, leave=False):
-        image_tensor = transform(data).to(rank)
+        image_tensor = data.to(rank)
         image_ids = tokenizer.encode_image(image_torch=image_tensor)
         if len(rows.keys()) == 0:
             for k, v in metas.items():
